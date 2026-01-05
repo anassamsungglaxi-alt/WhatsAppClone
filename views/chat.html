@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>WhatsApp Clone - الشات</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="container">
+    <header>
+        <h2 id="username">مرحبا، المستخدم</h2>
+        <button id="settings">⚙️</button>
+    </header>
+
+    <section id="friends-list">
+        <h3>الأصدقاء</h3>
+        <ul id="friends"></ul>
+    </section>
+
+    <section id="chat-section">
+        <div id="chat-box"></div>
+        <form id="message-form">
+            <input type="text" id="message-input" placeholder="اكتب رسالتك هنا..." required>
+            <button type="submit">إرسال</button>
+        </form>
+    </section>
+
+    <section id="add-friend-section">
+        <h3>إضافة صديق</h3>
+        <input type="text" id="friend-id" placeholder="ID الصديق">
+        <button id="add-friend-btn">إضافة</button>
+    </section>
+
+    <div id="settings-modal" style="display:none;">
+        <h3>إعدادات الحساب</h3>
+        <p id="account-info"></p>
+        <p>للتواصل مع مطور الموقع أنس مصطفى محمد عبد المجيد فرج قم بمراسلته واتساب على 01278115809</p>
+        <button onclick="closeSettings()">إغلاق</button>
+    </div>
+</div>
+<script src="/js/main.js"></script>
+</body>
+</html>
