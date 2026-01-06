@@ -1,9 +1,48 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<title>WhatsApp Clone - الشات</title>
-<link rel="stylesheet" href="/css/style.css">
+    <meta charset="UTF-8">
+    <title>WhatsApp Clone - الشات</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        /* ستايل سريع للإضافات الجديدة */
+        .friend-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .friend-item:hover { background: #f9f9f9; }
+        .notify-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #25D366;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+            display: none; /* مخفية افتراضياً */
+        }
+        .remove-btn {
+            background: none;
+            border: none;
+            color: #ff4d4d;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        #clear-chat-btn {
+            background: #f0f0f0;
+            color: #666;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-bottom: 5px;
+            display: none; /* بتظهر لما تفتح شات */
+        }
+    </style>
 </head>
 <body>
 <div class="container">
@@ -14,11 +53,17 @@
 
     <section id="friends-list">
         <h3>الأصدقاء</h3>
-        <ul id="friends"></ul>
+        <ul id="friends">
+            </ul>
     </section>
 
     <section id="chat-section">
-        <div id="chat-box"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 id="active-chat-with">اختر صديق لبدء الشات</h4>
+            <button id="clear-chat-btn" onclick="clearChat()">مسح السجل 🗑️</button>
+        </div>
+        <div id="chat-box" style="height: 300px; border: 1px solid #ddd; overflow-y: auto; padding: 10px; margin-bottom: 10px; background: #e5ddd5;">
+            </div>
         <form id="message-form">
             <input type="text" id="message-input" placeholder="اكتب رسالتك هنا..." required>
             <button type="submit">إرسال</button>
@@ -31,13 +76,147 @@
         <button id="add-friend-btn">إضافة</button>
     </section>
 
-    <div id="settings-modal" style="display:none;">
+    <div id="settings-modal" style="display:none; position: fixed; top: 20%; left: 50%; transform: translate(-50%, -20%); background: white; padding: 20px; border: 1px solid #ccc; box-shadow: 0 0 10px rgba(0,0,0,0.5); z-index: 100;">
         <h3>إعدادات الحساب</h3>
         <p id="account-info"></p>
-        <p>للتواصل مع مطور الموقع أنس مصطفى محمد عبد المجيد فرج قم بمراسلته واتساب على 01278115809</p>
-        <button onclick="closeSettings()">إغلاق</button>
+        <p style="font-size: 12px; color: #666;">للتواصل مع المطور أنس مصطفى: 01278115809</p>
+        <button onclick="document.getElementById('settings-modal').style.display='none'">إغلاق</button>
     </div>
 </div>
-<script src="/js/main.js"></script>
+
+<script>
+    // متغيرات أساسية
+    const userId = window.location.pathname.split('/').pop();
+    let activeFriendId = null;
+
+    // 1. جلب بيانات المستخدم والأصدقاء عند التحميل
+    async function loadData() {
+        // هنا المفروض تجيب اسم المستخدم من السيرفر (ممكن تضيف API لده)
+        document.getElementById('username').innerText = "مرحبا بك (ID: " + userId + ")";
+        loadFriends();
+    }
+
+    async function loadFriends() {
+        const res = await fetch('/api/friends/' + userId);
+        const friends = await res.json();
+        const list = document.getElementById('friends');
+        list.innerHTML = '';
+        
+        friends.forEach(f => {
+            list.innerHTML += `
+                <li class="friend-item">
+                    <span onclick="openChat('${f.id}', '${f.name}')">
+                        <span class="notify-dot" id="dot-${f.id}"></span>
+                        ${f.name}
+                    </span>
+                    <button class="remove-btn" onclick="removeFriend('${f.id}')" title="إلغاء الإضافة">×</button>
+                </li>
+            `;
+        });
+    }
+
+    // 2. فتح المحادثة
+    async function openChat(fId, fName) {
+        activeFriendId = fId;
+        document.getElementById('active-chat-with').innerText = "دردشة مع: " + fName;
+        document.getElementById('clear-chat-btn').style.display = 'block';
+        document.getElementById('dot-' + fId).style.display = 'none'; // إخفاء التنبيه عند الفتح
+        loadMessages();
+    }
+
+    async function loadMessages() {
+        if(!activeFriendId) return;
+        const res = await fetch(`/api/messages/${userId}/${activeFriendId}`);
+        const msgs = await res.json();
+        const box = document.getElementById('chat-box');
+        box.innerHTML = msgs.map(m => `
+            <div style="text-align: ${m.from == userId ? 'left' : 'right'}; margin-bottom: 10px;">
+                <span style="background: ${m.from == userId ? '#dcf8c6' : '#fff'}; padding: 5px 10px; border-radius: 10px; display: inline-block;">
+                    ${m.text}
+                </span>
+            </div>
+        `).join('');
+        box.scrollTop = box.scrollHeight;
+    }
+
+    // 3. مسح السجل
+    async function clearChat() {
+        if(confirm('هل تريد حذف سجل الرسائل مع هذا الصديق؟')) {
+            await fetch('/api/delete-chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ userId, friendId: activeFriendId })
+            });
+            loadMessages();
+        }
+    }
+
+    // 4. إلغاء الإضافة
+    async function removeFriend(friendId) {
+        if(confirm('هل تريد حذف هذا الشخص من قائمة أصدقائك؟')) {
+            await fetch('/api/remove-friend', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ userId, friendId })
+            });
+            loadFriends();
+            if(activeFriendId == friendId) {
+                document.getElementById('chat-box').innerHTML = '';
+                document.getElementById('active-chat-with').innerText = 'اختر صديق';
+            }
+        }
+    }
+
+    // 5. إرسال رسالة
+    document.getElementById('message-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('message-input');
+        if(!activeFriendId) return alert('اختر صديق أولاً');
+        
+        await fetch('/api/send-message', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ from: userId, to: activeFriendId, text: input.value })
+        });
+        input.value = '';
+        loadMessages();
+    };
+
+    // 6. إضافة صديق
+    document.getElementById('add-friend-btn').onclick = async () => {
+        const fId = document.getElementById('friend-id').value;
+        const res = await fetch('/api/add-friend', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ userId, friendId: fId })
+        });
+        const data = await res.json();
+        if(data.success) { alert('تمت الإضافة'); loadFriends(); }
+        else { alert('الـ ID غير موجود أو مضاف مسبقاً'); }
+    };
+
+    // 7. تحديث تلقائي للرسائل وتنبيه بالنقطة الخضراء
+    setInterval(async () => {
+        if(activeFriendId) loadMessages();
+        
+        // فحص الرسائل الجديدة لكل الأصدقاء (بشكل بسيط)
+        const res = await fetch('/api/friends/' + userId);
+        const friends = await res.json();
+        for(let f of friends) {
+            const mRes = await fetch(`/api/messages/${userId}/${f.id}`);
+            const msgs = await mRes.json();
+            if(msgs.length > 0) {
+                const lastMsg = msgs[msgs.length - 1];
+                // لو آخر رسالة جاية لي ومن الشخص ده وأنا مش فاتح الشات بتاعه
+                if(lastMsg.from == f.id && activeFriendId != f.id) {
+                    const dot = document.getElementById('dot-' + f.id);
+                    if(dot) dot.style.display = 'inline-block';
+                }
+            }
+        }
+    }, 3000);
+
+    loadData();
+</script>
 </body>
 </html>

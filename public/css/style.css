@@ -1,49 +1,139 @@
-#chat-box {
-    border: 1px solid #aaa;
-    height: 300px;
-    overflow-y: scroll;
-    padding: 10px;
-    margin-bottom: 10px;
-    background-color: #fff;
+/* تصميم عصري لتطبيق شات - أنس مصطفى */
+:root {
+    --primary-color: #25D366; /* لون واتساب */
+    --secondary-color: #075E54;
+    --bg-color: #f0f2f5;
+    --white: #ffffff;
+    --text-dark: #333;
+    --text-light: #666;
+    --bubble-me: #dcf8c6;
+    --bubble-other: #ffffff;
 }
 
-.message {
-    margin-bottom: 5px;
-    padding: 5px;
-    border-radius: 5px;
-    background-color: #e1ffc7;
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    margin: 0;
+    direction: rtl; /* لضبط الاتجاه العربي */
+    color: var(--text-dark);
+}
+
+.container {
+    max-width: 900px;
+    margin: 20px auto;
+    background: var(--white);
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+h1, h2, h3 {
+    color: var(--secondary-color);
+    text-align: center;
+}
+
+/* تنسيق الفورم (التسجيل والدخول) */
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+input {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    outline: none;
+    transition: 0.3s;
+}
+
+input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 5px rgba(37, 211, 102, 0.3);
+}
+
+/* تنسيق الأزرار */
+button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    background-color: #1da851;
+    transform: translateY(-2px);
+}
+
+/* تنسيق خاص بصفحة الشات */
+#chat-section {
+    display: flex;
+    flex-direction: column;
+    height: 400px;
+    background: #e5ddd5; /* لون خلفية شات واتساب الشهيرة */
+    border-radius: 10px;
+    padding: 15px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+}
+
+#message-form {
+    flex-direction: row;
 }
 
 #message-input {
-    width: 70%;
+    flex-grow: 1;
+    border-radius: 25px;
 }
 
-#message-form button {
-    width: 25%;
+/* قائمة الأصدقاء */
+#friends-list {
+    background: #f9f9f9;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 20px;
 }
 
-#friends-list ul {
-    list-style-type: none;
+#friends {
+    list-style: none;
     padding: 0;
 }
 
-#friends-list li {
-    padding: 5px;
-    border-bottom: 1px solid #ccc;
+#friends li {
+    padding: 10px;
+    background: white;
+    margin-bottom: 5px;
+    border-radius: 8px;
     cursor: pointer;
+    border-right: 4px solid var(--primary-color);
 }
 
-#friends-list li:hover {
-    background-color: #eee;
+/* الفوتر */
+footer {
+    margin-top: 20px;
+    padding: 15px;
+    font-size: 12px;
+    text-align: center;
+    background: #f1f1f1;
+    border-radius: 10px;
+    line-height: 1.6;
 }
 
+/* المودال (الإعدادات) */
 #settings-modal {
     position: fixed;
-    top: 20%;
-    left: 30%;
-    width: 40%;
-    background-color: #fff;
-    border: 2px solid #333;
-    padding: 20px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 30px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    border-radius: 15px;
     z-index: 1000;
 }
