@@ -2,221 +2,126 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>WhatsApp Clone - الشات</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>شات أنس المطور</title>
     <link rel="stylesheet" href="/css/style.css">
+    <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* ستايل سريع للإضافات الجديدة */
-        .friend-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-        }
-        .friend-item:hover { background: #f9f9f9; }
-        .notify-dot {
-            width: 10px;
-            height: 10px;
-            background-color: #25D366;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 5px;
-            display: none; /* مخفية افتراضياً */
-        }
-        .remove-btn {
-            background: none;
-            border: none;
-            color: #ff4d4d;
-            cursor: pointer;
-            font-size: 18px;
-        }
-        #clear-chat-btn {
-            background: #f0f0f0;
-            color: #666;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-bottom: 5px;
-            display: none; /* بتظهر لما تفتح شات */
-        }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
+        .container { display: flex; flex-direction: column; height: 100vh; }
+        header { background: #075E54; color: white; padding: 10px; text-align: center; }
+        #friends-list { background: #fff; border-bottom: 1px solid #ddd; max-height: 120px; overflow-y: auto; }
+        #chat-section { flex: 1; display: flex; flex-direction: column; background: #e5ddd5; }
+        #chat-box { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; }
+        .msg { padding: 8px 12px; margin: 4px; border-radius: 10px; max-width: 75%; font-size: 14px; }
+        .sent { background: #dcf8c6; align-self: flex-end; }
+        .received { background: #fff; align-self: flex-start; }
+        .ticks { font-size: 10px; color: #999; margin-right: 4px; }
+        .seen { color: #34b7f1 !important; }
+        .notify-dot { width: 10px; height: 10px; background: #25D366; border-radius: 50%; display: none; }
+        #typing-status { height: 20px; font-size: 12px; color: #075E54; padding: 0 10px; }
+        .friend-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        #message-form { display: flex; padding: 10px; background: #f0f0f0; }
+        #message-input { flex: 1; border: none; padding: 10px; border-radius: 20px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <header>
-        <h2 id="username">مرحبا، المستخدم</h2>
-        <button id="settings">⚙️</button>
-    </header>
-
-    <section id="friends-list">
-        <h3>الأصدقاء</h3>
-        <ul id="friends">
-            </ul>
-    </section>
-
-    <section id="chat-section">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h4 id="active-chat-with">اختر صديق لبدء الشات</h4>
-            <button id="clear-chat-btn" onclick="clearChat()">مسح السجل 🗑️</button>
+    <header><h3 id="display-name">واتساب أنس</h3></header>
+    <div id="friends-list"><ul id="friends" style="list-style:none; padding:0;"></ul></div>
+    <div id="chat-section">
+        <div style="padding:5px; background:#f9f9f9; display:flex; justify-content:space-between;">
+            <span id="active-chat-with">اختر صديق</span>
+            <button onclick="clearChat()" style="color:red; border:none; background:none; cursor:pointer;">مسح الشات 🗑️</button>
         </div>
-        <div id="chat-box" style="height: 300px; border: 1px solid #ddd; overflow-y: auto; padding: 10px; margin-bottom: 10px; background: #e5ddd5;">
-            </div>
+        <div id="typing-status"></div>
+        <div id="chat-box"></div>
         <form id="message-form">
-            <input type="text" id="message-input" placeholder="اكتب رسالتك هنا..." required>
+            <input type="text" id="message-input" placeholder="اكتب رسالة..." autocomplete="off">
             <button type="submit">إرسال</button>
         </form>
-    </section>
-
-    <section id="add-friend-section">
-        <h3>إضافة صديق</h3>
-        <input type="text" id="friend-id" placeholder="ID الصديق">
-        <button id="add-friend-btn">إضافة</button>
-    </section>
-
-    <div id="settings-modal" style="display:none; position: fixed; top: 20%; left: 50%; transform: translate(-50%, -20%); background: white; padding: 20px; border: 1px solid #ccc; box-shadow: 0 0 10px rgba(0,0,0,0.5); z-index: 100;">
-        <h3>إعدادات الحساب</h3>
-        <p id="account-info"></p>
-        <p style="font-size: 12px; color: #666;">للتواصل مع المطور أنس مصطفى: 01278115809</p>
-        <button onclick="document.getElementById('settings-modal').style.display='none'">إغلاق</button>
     </div>
 </div>
 
 <script>
-    // متغيرات أساسية
+    const socket = io();
     const userId = window.location.pathname.split('/').pop();
     let activeFriendId = null;
 
-    // 1. جلب بيانات المستخدم والأصدقاء عند التحميل
-    async function loadData() {
-        // هنا المفروض تجيب اسم المستخدم من السيرفر (ممكن تضيف API لده)
-        document.getElementById('username').innerText = "مرحبا بك (ID: " + userId + ")";
-        loadFriends();
-    }
+    socket.emit('join', userId);
 
     async function loadFriends() {
         const res = await fetch('/api/friends/' + userId);
         const friends = await res.json();
-        const list = document.getElementById('friends');
-        list.innerHTML = '';
-        
-        friends.forEach(f => {
-            list.innerHTML += `
-                <li class="friend-item">
-                    <span onclick="openChat('${f.id}', '${f.name}')">
-                        <span class="notify-dot" id="dot-${f.id}"></span>
-                        ${f.name}
-                    </span>
-                    <button class="remove-btn" onclick="removeFriend('${f.id}')" title="إلغاء الإضافة">×</button>
-                </li>
-            `;
-        });
+        document.getElementById('friends').innerHTML = friends.map(f => `
+            <li class="friend-item">
+                <span onclick="openChat('${f.id}', '${f.name}')" style="cursor:pointer;">
+                    ${f.name} <span class="notify-dot" id="dot-${f.id}">●</span>
+                </span>
+                <button onclick="removeFriend('${f.id}')" style="color:red; border:none; background:none;">❌</button>
+            </li>`).join('');
     }
 
-    // 2. فتح المحادثة
     async function openChat(fId, fName) {
         activeFriendId = fId;
-        document.getElementById('active-chat-with').innerText = "دردشة مع: " + fName;
-        document.getElementById('clear-chat-btn').style.display = 'block';
-        document.getElementById('dot-' + fId).style.display = 'none'; // إخفاء التنبيه عند الفتح
-        loadMessages();
+        document.getElementById('active-chat-with').innerText = "مع: " + fName;
+        document.getElementById('dot-' + fId).style.display = 'none';
+        const res = await fetch(`/api/messages/${userId}/${fId}`);
+        renderMessages(await res.json());
+        socket.emit('mark-seen', { userId, friendId: fId });
     }
 
-    async function loadMessages() {
-        if(!activeFriendId) return;
-        const res = await fetch(`/api/messages/${userId}/${activeFriendId}`);
-        const msgs = await res.json();
+    function renderMessages(msgs) {
         const box = document.getElementById('chat-box');
         box.innerHTML = msgs.map(m => `
-            <div style="text-align: ${m.from == userId ? 'left' : 'right'}; margin-bottom: 10px;">
-                <span style="background: ${m.from == userId ? '#dcf8c6' : '#fff'}; padding: 5px 10px; border-radius: 10px; display: inline-block;">
-                    ${m.text}
-                </span>
-            </div>
-        `).join('');
+            <div class="msg ${m.from == userId ? 'sent' : 'received'}">
+                ${m.text} ${m.from == userId ? `<span class="ticks ${m.seen ? 'seen' : ''}">${m.seen ? '✔✔' : '✔'}</span>` : ''}
+            </div>`).join('');
         box.scrollTop = box.scrollHeight;
     }
 
-    // 3. مسح السجل
-    async function clearChat() {
-        if(confirm('هل تريد حذف سجل الرسائل مع هذا الصديق؟')) {
-            await fetch('/api/delete-chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ userId, friendId: activeFriendId })
-            });
-            loadMessages();
-        }
-    }
-
-    // 4. إلغاء الإضافة
-    async function removeFriend(friendId) {
-        if(confirm('هل تريد حذف هذا الشخص من قائمة أصدقائك؟')) {
-            await fetch('/api/remove-friend', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ userId, friendId })
-            });
-            loadFriends();
-            if(activeFriendId == friendId) {
-                document.getElementById('chat-box').innerHTML = '';
-                document.getElementById('active-chat-with').innerText = 'اختر صديق';
-            }
-        }
-    }
-
-    // 5. إرسال رسالة
-    document.getElementById('message-form').onsubmit = async (e) => {
+    document.getElementById('message-form').onsubmit = (e) => {
         e.preventDefault();
         const input = document.getElementById('message-input');
-        if(!activeFriendId) return alert('اختر صديق أولاً');
-        
-        await fetch('/api/send-message', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ from: userId, to: activeFriendId, text: input.value })
-        });
+        if(!activeFriendId || !input.value) return;
+        socket.emit('send-msg', { from: userId, to: activeFriendId, text: input.value });
         input.value = '';
-        loadMessages();
     };
 
-    // 6. إضافة صديق
-    document.getElementById('add-friend-btn').onclick = async () => {
-        const fId = document.getElementById('friend-id').value;
-        const res = await fetch('/api/add-friend', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ userId, friendId: fId })
-        });
-        const data = await res.json();
-        if(data.success) { alert('تمت الإضافة'); loadFriends(); }
-        else { alert('الـ ID غير موجود أو مضاف مسبقاً'); }
-    };
+    document.getElementById('message-input').oninput = () => { if(activeFriendId) socket.emit('typing', { from: userId, to: activeFriendId }); };
 
-    // 7. تحديث تلقائي للرسائل وتنبيه بالنقطة الخضراء
-    setInterval(async () => {
-        if(activeFriendId) loadMessages();
-        
-        // فحص الرسائل الجديدة لكل الأصدقاء (بشكل بسيط)
-        const res = await fetch('/api/friends/' + userId);
-        const friends = await res.json();
-        for(let f of friends) {
-            const mRes = await fetch(`/api/messages/${userId}/${f.id}`);
-            const msgs = await mRes.json();
-            if(msgs.length > 0) {
-                const lastMsg = msgs[msgs.length - 1];
-                // لو آخر رسالة جاية لي ومن الشخص ده وأنا مش فاتح الشات بتاعه
-                if(lastMsg.from == f.id && activeFriendId != f.id) {
-                    const dot = document.getElementById('dot-' + f.id);
-                    if(dot) dot.style.display = 'inline-block';
-                }
-            }
+    socket.on('new-msg', (msg) => {
+        if (activeFriendId && (msg.from == activeFriendId || msg.from == userId)) {
+            openChat(activeFriendId, document.getElementById('active-chat-with').innerText.replace('مع: ', ''));
+        } else if (msg.from != userId) {
+            document.getElementById('dot-' + msg.from).style.display = 'inline-block';
         }
-    }, 3000);
+    });
 
-    loadData();
+    socket.on('user-typing', (data) => {
+        if (data.from == activeFriendId) {
+            document.getElementById('typing-status').innerText = "يكتب الآن...";
+            setTimeout(() => document.getElementById('typing-status').innerText = "", 2000);
+        }
+    });
+
+    socket.on('chat-seen', (data) => { if (activeFriendId == data.by) openChat(activeFriendId, ""); });
+
+    async function removeFriend(fId) {
+        if(confirm('حذف الصديق؟')){
+            await fetch('/api/remove-friend', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId, friendId:fId})});
+            loadFriends();
+        }
+    }
+
+    async function clearChat() {
+        if(confirm('مسح الشات؟')){
+            await fetch('/api/delete-chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId, friendId:activeFriendId})});
+            document.getElementById('chat-box').innerHTML = '';
+        }
+    }
+
+    loadFriends();
 </script>
 </body>
 </html>
