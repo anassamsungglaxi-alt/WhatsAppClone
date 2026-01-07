@@ -9,8 +9,11 @@ app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-const usersFile = path.join(__dirname, 'data', 'users.json');
-const messagesFile = path.join(__dirname, 'data', 'messages.json');
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
+
+const usersFile = path.join(dataDir, 'users.json');
+const messagesFile = path.join(dataDir, 'messages.json');
 
 if (!fs.existsSync(usersFile)) fs.writeFileSync(usersFile, '[]');
 if (!fs.existsSync(messagesFile)) fs.writeFileSync(messagesFile, '[]');
@@ -23,6 +26,7 @@ function saveMessages(msgs) { fs.writeFileSync(messagesFile, JSON.stringify(msgs
 io.on('connection', (socket) => {
     socket.on('join', (userId) => socket.join(userId.toString()));
     socket.on('typing', (data) => io.to(data.to.toString()).emit('user-typing', { from: data.from }));
+    
     socket.on('send-msg', (data) => {
         const msgs = readMessages();
         const newMsg = { from: data.from, to: data.to, text: data.text, seen: false, id: Date.now() };
@@ -31,25 +35,36 @@ io.on('connection', (socket) => {
         io.to(data.to.toString()).emit('new-msg', newMsg);
         io.to(data.from.toString()).emit('new-msg', newMsg);
     });
+
     socket.on('mark-seen', (data) => {
         let msgs = readMessages();
         msgs.forEach(m => { if (m.from == data.friendId && m.to == data.userId) m.seen = true; });
         saveMessages(msgs);
         io.to(data.friendId.toString()).emit('chat-seen', { by: data.userId });
     });
+
+    // أحداث المكالمات (WebRTC Signaling)
+    socket.on('call-user', (data) => {
+        io.to(data.to.toString()).emit('incoming-call', { from: data.from, offer: data.offer, type: data.type });
+    });
+    socket.on('answer-call', (data) => {
+        io.to(data.to.toString()).emit('call-accepted', { answer: data.answer });
+    });
+    socket.on('ice-candidate', (data) => {
+        io.to(data.to.toString()).emit('ice-candidate', { candidate: data.candidate });
+    });
+    socket.on('end-call', (data) => {
+        io.to(data.to.toString()).emit('call-ended');
+    });
 });
 
-// توجيه الصفحات
+// المسارات (Routes)
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views', 'index.html')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'views', 'register.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views', 'login.html')));
 app.get('/developer', (req, res) => res.sendFile(path.join(__dirname, 'views', 'developer.html')));
-
-// الصفحة الرئيسية (قائمة الأصدقاء)
 app.get('/chat/:id', (req, res) => res.sendFile(path.join(__dirname, 'views', 'chat.html')));
-// صفحة إضافة صديق
 app.get('/add-friend-page/:id', (req, res) => res.sendFile(path.join(__dirname, 'views', 'add-friend.html')));
-// صفحة غرفة الدردشة الخاصة
 app.get('/chat-view/:userId/:friendId', (req, res) => res.sendFile(path.join(__dirname, 'views', 'chat-room.html')));
 
 app.post('/register', (req, res) => {
@@ -67,36 +82,17 @@ app.post('/login', (req, res) => {
     else res.send('خطأ <a href="/login">عودة</a>');
 });
 
-// لوحة المطور
 app.post('/developer', (req, res) => {
     const { username, password } = req.body;
     if(username === 'user' && password === 'orangeuser') {
         const users = readUsers();
-        let html = `
-        <div dir="rtl" style="font-family:Arial; padding:20px;">
-            <h1>لوحة المطور</h1>
-            <button onclick="deleteSelected()" style="background:red; color:white; padding:10px; margin-bottom:10px; cursor:pointer;">حذف المحددين 🗑️</button>
-            <table border="1" style="width:100%; text-align:center;">
-                <tr><th><input type="checkbox" id="all" onclick="Array.from(document.querySelectorAll('.cb')).forEach(c=>c.checked=this.checked)"></th><th>ID</th><th>الاسم</th><th>العمر</th><th>كلمة السر</th></tr>`;
-        users.forEach(u => {
-            html += `<tr><td><input type="checkbox" class="cb" value="${u.id}"></td><td>${u.id}</td><td>${u.name}</td><td>${u.age}</td><td>${u.password}</td></tr>`;
-        });
-        html += `</table></div>
-        <script>
-            async function deleteSelected(){
-                const ids = Array.from(document.querySelectorAll('.cb:checked')).map(c=>c.value);
-                if(!ids.length) return alert('حدد حسابات');
-                if(confirm('متأكد؟')){
-                    await fetch('/api/delete-multiple-users', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ids})});
-                    location.reload();
-                }
-            }
-        </script>`;
+        let html = `<div dir="rtl" style="font-family:Arial; padding:20px;"><h1>لوحة المطور</h1><button onclick="deleteSelected()" style="background:red; color:white; padding:10px; margin-bottom:10px; cursor:pointer;">حذف المحددين 🗑️</button><table border="1" style="width:100%; text-align:center;"><tr><th><input type="checkbox" id="all" onclick="Array.from(document.querySelectorAll('.cb')).forEach(c=>c.checked=this.checked)"></th><th>ID</th><th>الاسم</th><th>العمر</th><th>كلمة السر</th></tr>`;
+        users.forEach(u => { html += `<tr><td><input type="checkbox" class="cb" value="${u.id}"></td><td>${u.id}</td><td>${u.name}</td><td>${u.age}</td><td>${u.password}</td></tr>`; });
+        html += `</table></div><script>async function deleteSelected(){const ids = Array.from(document.querySelectorAll('.cb:checked')).map(c=>c.value);if(!ids.length) return alert('حدد حسابات');if(confirm('متأكد؟')){await fetch('/api/delete-multiple-users', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ids})});location.reload();}}</script>`;
         res.send(html);
     } else res.send('خطأ');
 });
 
-// APIs العمليات
 app.post('/api/delete-multiple-users', (req, res) => {
     saveUsers(readUsers().filter(u => !req.body.ids.includes(u.id.toString())));
     res.json({ success: true });
@@ -137,4 +133,5 @@ app.post('/api/add-friend', (req, res) => {
     res.json({ success: true });
 });
 
-http.listen(3000, () => console.log('Server running on 3000'));
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => console.log('Server running on ' + PORT));
