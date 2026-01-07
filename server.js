@@ -25,10 +25,7 @@ function saveMessages(msgs) { fs.writeFileSync(messagesFile, JSON.stringify(msgs
 
 io.on('connection', (socket) => {
     socket.on('join', (userId) => socket.join(userId.toString()));
-    
-    socket.on('typing', (data) => {
-        io.to(data.to.toString()).emit('user-typing', { from: data.from });
-    });
+    socket.on('typing', (data) => io.to(data.to.toString()).emit('user-typing', { from: data.from }));
     
     socket.on('send-msg', (data) => {
         const msgs = readMessages();
@@ -46,10 +43,18 @@ io.on('connection', (socket) => {
         io.to(data.friendId.toString()).emit('chat-seen', { by: data.userId });
     });
 
-    // توحيد أحداث المكالمات عشان تسمع في الشات
-    socket.on('call-signal', (data) => {
-        // أي إشارة مكالمة بتيجي (Offer, Answer, Candidate) بنحولها فوراً للطرف التاني
-        io.to(data.to.toString()).emit('call-signal', data);
+    // أحداث المكالمات (WebRTC Signaling)
+    socket.on('call-user', (data) => {
+        io.to(data.to.toString()).emit('incoming-call', { from: data.from, offer: data.offer, type: data.type });
+    });
+    socket.on('answer-call', (data) => {
+        io.to(data.to.toString()).emit('call-accepted', { answer: data.answer });
+    });
+    socket.on('ice-candidate', (data) => {
+        io.to(data.to.toString()).emit('ice-candidate', { candidate: data.candidate });
+    });
+    socket.on('end-call', (data) => {
+        io.to(data.to.toString()).emit('call-ended');
     });
 });
 

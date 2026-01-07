@@ -2,163 +2,220 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chat Pro - Anas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>دردشة أنس</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
+        /* التنسيقات العامة للحفاظ على ثبات الشاشة */
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body, html { height: 100%; width: 100%; background: #e5ddd5; font-family: sans-serif; overflow: hidden; }
-        .app-container { display: flex; flex-direction: column; height: 100vh; max-width: 700px; margin: 0 auto; background: #fff; position: relative; }
-        header { background: #075E54; color: white; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 100; }
-        #chat-box { flex: 1; overflow-y: auto; padding: 15px; background: #e5ddd5; display: flex; flex-direction: column; gap: 10px; }
-        .msg { padding: 8px 12px; border-radius: 12px; max-width: 85%; font-size: 15px; position: relative; word-wrap: break-word; }
-        .sent { background: #dcf8c6; align-self: flex-end; }
-        .received { background: #fff; align-self: flex-start; }
+        body, html { height: 100%; width: 100%; background: #e5ddd5; font-family: sans-serif; overflow: hidden; position: fixed; }
         
-        /* واجهة المكالمة - التعديل الجديد */
-        #call-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 2000; display: none; flex-direction: column; }
-        #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
-        #localVideo { position: absolute; top: 20px; right: 20px; width: 100px; height: 140px; border: 2px solid #fff; border-radius: 8px; object-fit: cover; z-index: 2001; }
-        .call-btns { position: absolute; bottom: 40px; width: 100%; display: flex; justify-content: center; z-index: 2002; }
-        .end-btn { background: #ff3b30; color: white; border: none; padding: 15px 35px; border-radius: 30px; font-weight: bold; cursor: pointer; }
+        .main-wrapper { display: flex; flex-direction: column; height: 100dvh; max-width: 800px; margin: 0 auto; background: #fff; position: relative; width: 100%; }
+        
+        header { background: #075E54; color: white; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 100; }
+        
+        #chat-box { flex: 1; overflow-y: auto; padding: 15px; background: #e5ddd5; display: flex; flex-direction: column; gap: 10px; -webkit-overflow-scrolling: touch; }
+        
+        .msg { padding: 8px 12px; border-radius: 12px; max-width: 85%; font-size: 15px; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.1); word-wrap: break-word; overflow-wrap: break-word; }
+        .sent { background: #dcf8c6; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .received { background: #fff; align-self: flex-start; border-bottom-left-radius: 2px; }
+        
+        .meta { display: flex; align-items: center; justify-content: flex-end; font-size: 11px; margin-top: 4px; }
+        .ticks { margin-right: 4px; font-weight: bold; color: #888; }
+        .ticks.seen { color: #34b7f1; }
+        
+        .input-bar { background: #f0f0f0; padding: 10px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; border-top: 1px solid #ccc; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+        
+        #input { flex: 1; padding: 12px 15px; border: none; border-radius: 25px; font-size: 16px; outline: none; background: #fff; }
+        
+        .action-btn { background: #075E54; color: white; border: none; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+        
+        #rec-btn { background: #ea4335; }
+        .recording { animation: pulse 1s infinite; }
+        @keyframes pulse { 50% { transform: scale(1.1); opacity: 0.7; } }
+        
+        audio { width: 220px; height: 45px; margin-top: 5px; }
 
-        .footer-bar { background: #f0f0f0; padding: 10px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; border-top: 1px solid #ccc; }
-        #input { flex: 1; padding: 12px; border: none; border-radius: 25px; font-size: 16px; outline: none; }
-        .btn-action { background: #075E54; color: white; border: none; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
-        #mic-btn { background: #ea4335; }
+        /* شاشة المكالمة العائمة */
+        #call-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; color: white; }
+        #video-grid { position: relative; width: 100%; height: 70%; display: flex; justify-content: center; }
+        video { width: 90%; height: 100%; border-radius: 15px; background: #222; object-fit: cover; }
+        #local-video { width: 100px; height: 150px; position: absolute; bottom: 10px; right: 25px; border: 2px solid white; z-index: 2001; }
+        .call-btns { margin-top: 30px; display: flex; gap: 20px; }
+        .hangup { background: #ff3b30; padding: 15px 40px; border-radius: 30px; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 16px; }
+
+        @media (min-width: 800px) { .main-wrapper { border-left: 1px solid #ddd; border-right: 1px solid #ddd; } }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    <header>
-        <div style="display:flex; align-items:center; gap:10px;">
-            <button onclick="location.href='/chat/'+userId" style="background:none; border:none; color:white; font-size:20px;">⬅</button>
-            <span style="font-weight:bold;">دردشة خاصة</span>
+    <div id="call-overlay">
+        <h3 id="call-info" style="margin-bottom: 20px;">جاري الاتصال...</h3>
+        <div id="video-grid">
+            <video id="remote-video" autoplay playsinline></video>
+            <video id="local-video" autoplay playsinline muted></video>
         </div>
-        <div style="display:flex; gap:15px;">
-            <button onclick="initiateCall()" style="background:none; border:none; font-size:22px;">📞</button>
-            <button onclick="clearChat()" style="background:none; border:none; font-size:20px;">🗑️</button>
-        </div>
-    </header>
-
-    <div id="chat-box"></div>
-    <div id="typing-status" style="height:18px; font-size:12px; color:#075E54; padding:0 15px; font-weight:bold;"></div>
-
-    <form class="footer-bar" id="msg-form">
-        <button type="button" id="mic-btn" class="btn-action" onclick="handleMic()">🎤</button>
-        <input type="text" id="input" placeholder="اكتب رسالة..." autocomplete="off">
-        <button type="submit" class="btn-action">➤</button>
-    </form>
-
-    <div id="call-screen">
-        <video id="remoteVideo" autoplay playsinline></video>
-        <video id="localVideo" autoplay muted playsinline></video>
         <div class="call-btns">
-            <button class="end-btn" onclick="endCall()">إنهاء المكالمة</button>
+            <button class="hangup" onclick="endCall()">إنهاء المكالمة</button>
         </div>
     </div>
-</div>
 
-<script>
-    const socket = io();
-    const [,,userId, friendId] = window.location.pathname.split('/');
-    let localStream, peerConnection, mediaRecorder, chunks = [];
-    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    <div class="main-wrapper">
+        <header>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <button onclick="location.href='/chat/'+userId" style="background:none; border:none; color:white; font-size:22px; cursor:pointer;">⬅</button>
+                <span style="font-weight:bold;">دردشة خاصة</span>
+            </div>
+            <div style="display:flex; gap:15px; align-items:center;">
+                <button onclick="initCall('voice')" title="مكالمة صوتية" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;">📞</button>
+                <button onclick="initCall('video')" title="مكالمة فيديو" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;">📹</button>
+                <button onclick="clearChat()" title="مسح السجل" style="background:none; border:none; font-size:22px; color:white; cursor:pointer;">🗑️</button>
+            </div>
+        </header>
 
-    socket.emit('join', userId);
+        <div id="chat-box"></div>
+        <div id="typing-box" style="height:20px; font-size:12px; color:#075E54; padding:0 15px; font-weight:bold; background:#e5ddd5;"></div>
 
-    // تحميل الشات
-    async function loadMessages() {
-        const msgs = await (await fetch(`/api/messages/${userId}/${friendId}`)).json();
-        const box = document.getElementById('chat-box');
-        box.innerHTML = msgs.map(m => {
-            const mine = m.from == userId;
-            return `<div class="msg ${mine ? 'sent' : 'received'}">${m.text.startsWith('data:audio') ? `<audio controls src="${m.text}"></audio>` : `<div>${m.text}</div>`}</div>`;
-        }).join('');
-        box.scrollTop = box.scrollHeight;
-    }
+        <form class="input-bar" id="msg-form" onsubmit="return false;">
+            <button type="button" id="rec-btn" class="action-btn" onclick="toggleMic()">🎤</button>
+            <input type="text" id="input" placeholder="اكتب رسالة..." autocomplete="off">
+            <button type="submit" class="action-btn" id="send-btn">➤</button>
+        </form>
+    </div>
 
-    document.getElementById('msg-form').onsubmit = (e) => {
-        e.preventDefault();
-        const inp = document.getElementById('input');
-        if(!inp.value.trim()) return;
-        socket.emit('send-msg', { from: userId, to: friendId, text: inp.value });
-        inp.value = '';
-    };
+    <script>
+        const socket = io();
+        const parts = window.location.pathname.split('/');
+        const userId = parts[2];
+        const friendId = parts[3];
+        let mediaRecorder, chunks = [];
+        let pc, localStream;
 
-    // --- نظام المكالمات الفعلي ---
-    async function setupPeer(isOffer) {
-        peerConnection = new RTCPeerConnection(rtcConfig);
-        
-        // ربط الكاميرا والمايك
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        document.getElementById('localVideo').srcObject = localStream;
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        // ثبات الشاشة عند فتح الكيبورد
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                document.body.style.height = window.visualViewport.height + 'px';
+                window.scrollTo(0, 0);
+                document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
+            });
+        }
 
-        // استقبال صورة وصوت الطرف الآخر
-        peerConnection.ontrack = e => {
-            console.log("استلمت فيديو الطرف الآخر!");
-            document.getElementById('remoteVideo').srcObject = e.streams[0];
+        socket.emit('join', userId);
+
+        async function load() {
+            const res = await fetch(`/api/messages/${userId}/${friendId}`);
+            const msgs = await res.json();
+            const box = document.getElementById('chat-box');
+            box.innerHTML = msgs.map(m => {
+                const mine = m.from == userId;
+                const status = mine ? `<div class="meta"><span class="ticks ${m.seen ? 'seen' : ''}">${m.seen ? '✔✔' : '✔'}</span></div>` : '';
+                let body = m.text.startsWith('data:audio') ? `<audio controls src="${m.text}"></audio>` : `<div>${m.text}</div>`;
+                return `<div class="msg ${mine ? 'sent' : 'received'}">${body}${status}</div>`;
+            }).join('');
+            box.scrollTop = box.scrollHeight;
+            if(msgs.some(m => m.to == userId && !m.seen)) socket.emit('mark-seen', { userId, friendId });
+        }
+
+        document.getElementById('send-btn').onclick = () => {
+            const inp = document.getElementById('input');
+            if(!inp.value.trim()) return;
+            socket.emit('send-msg', { from: userId, to: friendId, text: inp.value });
+            inp.value = '';
+            inp.focus();
         };
 
-        peerConnection.onicecandidate = e => {
-            if (e.candidate) socket.emit('call-signal', { to: friendId, candidate: e.candidate });
-        };
-    }
+        document.getElementById('input').oninput = () => socket.emit('typing', { from: userId, to: friendId });
+        socket.on('user-typing', d => { if(d.from == friendId) { document.getElementById('typing-box').innerText = 'يكتب الآن...'; setTimeout(() => document.getElementById('typing-box').innerText = '', 2000); }});
 
-    async function initiateCall() {
-        document.getElementById('call-screen').style.display = 'flex';
-        await setupPeer(true);
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        socket.emit('call-signal', { to: friendId, offer });
-    }
+        // --- نظام المكالمات WebRTC ---
+        const iceConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-    socket.on('call-signal', async (data) => {
-        if (data.offer) {
-            if (!confirm("مكالمة من صديقك.. رد؟")) return;
-            document.getElementById('call-screen').style.display = 'flex';
-            await setupPeer(false);
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            socket.emit('call-signal', { to: friendId, answer });
-        } else if (data.answer) {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        } else if (data.candidate) {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(() => {});
+        async function initCall(type) {
+            document.getElementById('call-overlay').style.display = 'flex';
+            document.getElementById('call-info').innerText = "جاري الاتصال...";
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' });
+                document.getElementById('local-video').srcObject = localStream;
+                
+                pc = new RTCPeerConnection(iceConfig);
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+                pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate', { to: friendId, candidate: e.candidate }); };
+                pc.ontrack = e => { document.getElementById('remote-video').srcObject = e.streams[0]; };
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit('call-user', { to: friendId, from: userId, offer, type });
+            } catch(e) { alert("يرجى تفعيل الكاميرا والمايك"); endCall(); }
         }
-    });
 
-    function endCall() {
-        if(localStream) localStream.getTracks().forEach(t => t.stop());
-        if(peerConnection) peerConnection.close();
-        document.getElementById('call-screen').style.display = 'none';
-    }
+        socket.on('incoming-call', async (data) => {
+            if(confirm(`مكالمة ${data.type === 'video' ? 'فيديو' : 'صوتية'} من صديقك.. هل تقبل؟`)) {
+                document.getElementById('call-overlay').style.display = 'flex';
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: data.type === 'video' });
+                document.getElementById('local-video').srcObject = localStream;
 
-    async function handleMic() {
-        const btn = document.getElementById('mic-btn');
-        if (!mediaRecorder || mediaRecorder.state === "inactive") {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            chunks = [];
-            mediaRecorder.ondataavailable = e => chunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const reader = new FileReader();
-                reader.readAsDataURL(new Blob(chunks, { type: 'audio/webm' }));
-                reader.onloadend = () => socket.emit('send-msg', { from: userId, to: friendId, text: reader.result });
-            };
-            mediaRecorder.start();
-            btn.innerText = "🛑";
-        } else {
-            mediaRecorder.stop();
-            btn.innerText = "🎤";
+                pc = new RTCPeerConnection(iceConfig);
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+                pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate', { to: data.from, candidate: e.candidate }); };
+                pc.ontrack = e => { document.getElementById('remote-video').srcObject = e.streams[0]; };
+
+                await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                socket.emit('answer-call', { to: data.from, answer });
+            } else { socket.emit('end-call', { to: data.from }); }
+        });
+
+        socket.on('call-accepted', async (data) => { 
+            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            document.getElementById('call-info').innerText = "مكالمة نشطة";
+        });
+        socket.on('ice-candidate', async (data) => { if(pc) await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); });
+        socket.on('call-ended', () => { alert("انتهت المكالمة"); endCall(false); });
+
+        function endCall(notify = true) {
+            if(notify) socket.emit('end-call', { to: friendId });
+            if(localStream) localStream.getTracks().forEach(t => t.stop());
+            if(pc) pc.close();
+            pc = null;
+            document.getElementById('call-overlay').style.display = 'none';
         }
-    }
 
-    socket.on('new-msg', loadMessages);
-    loadMessages();
-</script>
+        // تسجيل الريكورد
+        async function toggleMic() {
+            const btn = document.getElementById('rec-btn');
+            if (!mediaRecorder || mediaRecorder.state === "inactive") {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    chunks = [];
+                    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(new Blob(chunks, { type: 'audio/webm' }));
+                        reader.onloadend = () => socket.emit('send-msg', { from: userId, to: friendId, text: reader.result });
+                        stream.getTracks().forEach(t => t.stop());
+                    };
+                    mediaRecorder.start();
+                    btn.innerText = "🛑"; btn.classList.add('recording');
+                } catch(err) { alert("افتح صلاحية المايك أولاً"); }
+            } else {
+                mediaRecorder.stop();
+                btn.innerText = "🎤"; btn.classList.remove('recording');
+            }
+        }
+
+        async function clearChat() {
+            if(confirm('سيتم حذف المحادثة نهائياً؟')) {
+                await fetch('/api/delete-chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId, friendId }) });
+                load();
+            }
+        }
+
+        socket.on('new-msg', () => load());
+        socket.on('chat-seen', () => load());
+        load();
+    </script>
 </body>
 </html>
