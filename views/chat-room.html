@@ -3,127 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>دردشة - ريكوردات</title>
+    <title>دردشة أنس</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
+        /* إعدادات أساسية لمنع السكرول الخارجي */
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; width: 100%; overflow: hidden; position: fixed; background: #e5ddd5; font-family: sans-serif; }
-        .container { display: flex; flex-direction: column; height: 100vh; width: 100%; }
-        header { background: #075E54; color: white; padding: 15px; display: flex; align-items: center; flex-shrink: 0; }
-        
-        #chat-box { flex: 1; overflow-y: scroll; -webkit-overflow-scrolling: touch; padding: 15px; display: flex; flex-direction: column; gap: 10px; touch-action: pan-y; }
-        
-        .msg { padding: 10px; border-radius: 12px; max-width: 85%; font-size: 16px; word-wrap: break-word; position: relative; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
-        .sent { background: #dcf8c6; align-self: flex-end; }
-        .received { background: #fff; align-self: flex-start; }
+        body, html { 
+            height: 100%; 
+            width: 100%; 
+            overflow: hidden; 
+            font-family: sans-serif; 
+            background-color: #e5ddd5;
+        }
 
-        /* ستايل الريكورد الصوتي */
-        audio { max-width: 100%; height: 35px; margin-top: 5px; }
+        /* الحاوية الرئيسية تأخذ طول الشاشة بالظبط */
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
 
-        #form { background: #f0f0f0; padding: 10px; display: flex; gap: 8px; align-items: center; flex-shrink: 0; border-top: 1px solid #ccc; }
-        #input { flex: 1; padding: 12px; border-radius: 20px; border: 1px solid #ddd; font-size: 16px; outline: none; }
-        
-        /* أزرار الأكشن */
-        .action-btn { background: #075E54; color: white; border: none; border-radius: 50%; width: 45px; height: 45px; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
-        .rec-active { background: red !important; animation: pulse 1s infinite; }
-        
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        /* الهيدر ثابت فوق */
+        header {
+            background: #075E54;
+            color: white;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0; /* يمنع الهيدر من الانضغاط */
+        }
+
+        /* صندوق الرسائل هو اللي بياخد باقي المساحة وبيعمل سكرول */
+        #chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            -webkit-overflow-scrolling: touch; /* سكرول ناعم للموبايل */
+        }
+
+        /* تنسيق فقاعات الرسائل */
+        .msg { padding: 10px; border-radius: 10px; max-width: 85%; font-size: 16px; line-height: 1.4; position: relative; word-wrap: break-word; }
+        .sent { background: #dcf8c6; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .received { background: #fff; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .ticks { font-size: 12px; color: #34b7f1; margin-right: 5px; }
+
+        /* منطقة الكتابة - أهم جزء - ثابتة تحت */
+        .input-area {
+            background: #f0f0f0;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0; /* يضمن إنها متختفيش أبداً */
+            border-top: 1px solid #ddd;
+        }
+
+        #input {
+            flex: 1;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        #send-btn {
+            background: #075E54;
+            color: white;
+            border: none;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        audio { max-width: 100%; margin-top: 5px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <button onclick="location.href='/chat/'+userId" style="background:none; border:none; color:white; font-size:24px; margin-left:15px;">⬅</button>
-            <span>دردشة خاصة</span>
-        </header>
 
-        <div id="chat-box"></div>
-        
-        <form id="form">
-            <button type="button" id="mic-btn" class="action-btn">🎤</button>
-            <input type="text" id="input" placeholder="اكتب رسالة..." autocomplete="off">
-            <button type="submit" id="send" class="action-btn">➤</button>
-        </form>
-    </div>
+<div class="main-container">
+    <header>
+        <button onclick="history.back()" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;">⬅</button>
+        <span id="chat-title">دردشة خاصة</span>
+        <div style="width: 20px;"></div> </header>
 
-    <script>
-        const socket = io();
-        const parts = window.location.pathname.split('/');
-        const userId = parts[2];
-        const friendId = parts[3];
+    <div id="chat-box">
+        </div>
+
+    <div id="typing-status" style="height: 20px; font-size: 12px; color: #075E54; padding: 0 15px; background: #e5ddd5;"></div>
+
+    <form class="input-area" id="msg-form">
+        <input type="text" id="input" placeholder="اكتب رسالة..." autocomplete="off">
+        <button type="submit" id="send-btn">➤</button>
+    </form>
+</div>
+
+<script>
+    const socket = io();
+    const parts = window.location.pathname.split('/');
+    const userId = parts[2];
+    const friendId = parts[3];
+
+    socket.emit('join', userId);
+
+    async function loadMessages() {
+        const res = await fetch(`/api/messages/${userId}/${friendId}`);
+        const msgs = await res.json();
         const box = document.getElementById('chat-box');
+        
+        box.innerHTML = msgs.map(m => {
+            // لو الرسالة ريكورد (تبدأ بـ http أو مسار ملف صوت)
+            if (m.text.includes('.webm') || m.text.includes('.mp3')) {
+                return `<div class="msg ${m.from == userId ? 'sent' : 'received'}">
+                            <audio controls src="${m.text}"></audio>
+                        </div>`;
+            }
+            // لو رسالة نصية عادية
+            return `<div class="msg ${m.from == userId ? 'sent' : 'received'}">
+                        ${m.text} ${m.from == userId ? '<span class="ticks">✔✔</span>' : ''}
+                    </div>`;
+        }).join('');
+        
+        box.scrollTop = box.scrollHeight; // سكرول لآخر رسالة
+    }
 
-        // متغيرات التسجيل
-        let mediaRecorder;
-        let audioChunks = [];
-        const micBtn = document.getElementById('mic-btn');
+    document.getElementById('msg-form').onsubmit = (e) => {
+        e.preventDefault();
+        const input = document.getElementById('input');
+        if(!input.value) return;
+        socket.emit('send-msg', { from: userId, to: friendId, text: input.value });
+        input.value = '';
+    };
 
-        socket.emit('join', userId);
+    socket.on('new-msg', () => loadMessages());
+    
+    // التنبيه عند الكتابة
+    document.getElementById('input').oninput = () => {
+        socket.emit('typing', { from: userId, to: friendId });
+    };
 
-        // وظيفة التحميل وعرض الرسائل (بما فيها الصوت)
-        async function loadMsgs(isFirstLoad = false) {
-            const res = await fetch(`/api/messages/${userId}/${friendId}`);
-            const msgs = await res.json();
-            
-            box.innerHTML = msgs.map(m => {
-                const isAudio = m.text.startsWith('data:audio');
-                return `
-                <div class="msg ${m.from == userId ? 'sent' : 'received'}">
-                    ${isAudio ? `<audio controls src="${m.text}"></audio>` : m.text}
-                    <div style="text-align:left; font-size:10px; color:#999; margin-top:3px;">
-                        ${m.from == userId ? (m.seen ? '<span style="color:#34b7f1">✔✔</span>' : '✔') : ''}
-                    </div>
-                </div>`;
-            }).join('');
-
-            if(isFirstLoad) box.scrollTop = box.scrollHeight;
+    socket.on('user-typing', (data) => {
+        if(data.from == friendId) {
+            document.getElementById('typing-status').innerText = 'يكتب الآن...';
+            setTimeout(() => document.getElementById('typing-status').innerText = '', 2000);
         }
+    });
 
-        // منطق تسجيل الصوت
-        micBtn.onclick = async () => {
-            if (!mediaRecorder || mediaRecorder.state === "inactive") {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
+    loadMessages();
+</script>
 
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const reader = new FileReader();
-                    reader.readAsDataURL(audioBlob); 
-                    reader.onloadend = () => {
-                        const base64Audio = reader.result;
-                        socket.emit('send-msg', { from: userId, to: friendId, text: base64Audio });
-                    };
-                    micBtn.classList.remove('rec-active');
-                    micBtn.innerText = '🎤';
-                };
-
-                mediaRecorder.start();
-                micBtn.classList.add('rec-active');
-                micBtn.innerText = '🛑';
-            } else {
-                mediaRecorder.stop();
-            }
-        };
-
-        document.getElementById('form').onsubmit = (e) => {
-            e.preventDefault();
-            const val = document.getElementById('input').value;
-            if(!val) return;
-            socket.emit('send-msg', { from: userId, to: friendId, text: val });
-            document.getElementById('input').value = '';
-            setTimeout(() => box.scrollTop = box.scrollHeight, 100);
-        };
-
-        socket.on('new-msg', (msg) => {
-            if(msg.from == friendId || msg.from == userId) {
-                loadMsgs().then(() => box.scrollTop = box.scrollHeight);
-            }
-        });
-
-        loadMsgs(true);
-    </script>
 </body>
 </html>
