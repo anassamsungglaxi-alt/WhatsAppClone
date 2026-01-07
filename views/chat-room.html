@@ -8,16 +8,19 @@
     <style>
         /* إعدادات الشاشة الذكية */
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        /* التعديل هنا لضمان ثبات الأزرار في الموبايل */
         body, html { 
             height: 100%; width: 100%; background: #e5ddd5; 
-            font-family: sans-serif; overflow: hidden; 
+            font-family: sans-serif; overflow: hidden; /* منع سكرول الصفحة نفسها */
+            display: flex; flex-direction: column;
         }
 
         /* حاوية مرنة تمنع اختفاء الأزرار */
         .main-wrapper {
             display: flex; flex-direction: column; 
             height: 100vh; max-width: 800px; margin: 0 auto;
-            background: #fff; position: relative;
+            background: #fff; position: relative; width: 100%;
         }
 
         header { 
@@ -26,7 +29,7 @@
             flex-shrink: 0; z-index: 100;
         }
 
-        /* صندوق الشات: سكرول ذكي لا يتأثر بطول الرسالة */
+        /* صندوق الشات: السكرول هنا بس */
         #chat-box { 
             flex: 1; overflow-y: auto; padding: 15px; background: #e5ddd5;
             display: flex; flex-direction: column; gap: 10px;
@@ -47,11 +50,12 @@
         .ticks { margin-right: 4px; font-weight: bold; color: #888; }
         .ticks.seen { color: #34b7f1; }
 
-        /* شريط الكتابة: ثابت تماماً في الأسفل */
+        /* شريط الكتابة: ثابت تماماً في الأسفل بفضل flex-shrink: 0 */
         .input-bar { 
             background: #f0f0f0; padding: 10px; 
             display: flex; align-items: center; gap: 10px; 
             flex-shrink: 0; border-top: 1px solid #ccc;
+            z-index: 100;
         }
 
         #input { 
@@ -118,7 +122,6 @@
                 const mine = m.from == userId;
                 const status = mine ? `<div class="meta"><span class="ticks ${m.seen ? 'seen' : ''}">${m.seen ? '✔✔' : '✔'}</span></div>` : '';
                 
-                // عرض الريكورد كـ Player وليس كود نصي
                 let body = m.text.startsWith('data:audio') 
                     ? `<audio controls src="${m.text}"></audio>` 
                     : `<div>${m.text}</div>`;
@@ -150,17 +153,19 @@
         async function toggleMic() {
             const btn = document.getElementById('rec-btn');
             if (!mediaRecorder || mediaRecorder.state === "inactive") {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                chunks = [];
-                mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(new Blob(chunks, { type: 'audio/webm' }));
-                    reader.onloadend = () => socket.emit('send-msg', { from: userId, to: friendId, text: reader.result });
-                };
-                mediaRecorder.start();
-                btn.innerText = "🛑"; btn.classList.add('recording');
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    chunks = [];
+                    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(new Blob(chunks, { type: 'audio/webm' }));
+                        reader.onloadend = () => socket.emit('send-msg', { from: userId, to: friendId, text: reader.result });
+                    };
+                    mediaRecorder.start();
+                    btn.innerText = "🛑"; btn.classList.add('recording');
+                } catch(err) { alert("افتح صلاحية المايك أولاً"); }
             } else {
                 mediaRecorder.stop();
                 btn.innerText = "🎤"; btn.classList.remove('recording');
