@@ -20,14 +20,9 @@ function saveUsers(users) { fs.writeFileSync(usersFile, JSON.stringify(users, nu
 function readMessages() { return JSON.parse(fs.readFileSync(messagesFile)); }
 function saveMessages(msgs) { fs.writeFileSync(messagesFile, JSON.stringify(msgs, null, 2)); }
 
-// Socket.io للميزات اللحظية
 io.on('connection', (socket) => {
     socket.on('join', (userId) => socket.join(userId.toString()));
-    
-    socket.on('typing', (data) => {
-        io.to(data.to.toString()).emit('user-typing', { from: data.from });
-    });
-
+    socket.on('typing', (data) => io.to(data.to.toString()).emit('user-typing', { from: data.from }));
     socket.on('send-msg', (data) => {
         const msgs = readMessages();
         const newMsg = { from: data.from, to: data.to, text: data.text, seen: false, id: Date.now() };
@@ -36,7 +31,6 @@ io.on('connection', (socket) => {
         io.to(data.to.toString()).emit('new-msg', newMsg);
         io.to(data.from.toString()).emit('new-msg', newMsg);
     });
-
     socket.on('mark-seen', (data) => {
         let msgs = readMessages();
         msgs.forEach(m => { if (m.from == data.friendId && m.to == data.userId) m.seen = true; });
@@ -45,12 +39,18 @@ io.on('connection', (socket) => {
     });
 });
 
-// الصفحات
+// توجيه الصفحات
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views', 'index.html')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'views', 'register.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views', 'login.html')));
 app.get('/developer', (req, res) => res.sendFile(path.join(__dirname, 'views', 'developer.html')));
+
+// الصفحة الرئيسية (قائمة الأصدقاء)
 app.get('/chat/:id', (req, res) => res.sendFile(path.join(__dirname, 'views', 'chat.html')));
+// صفحة إضافة صديق
+app.get('/add-friend-page/:id', (req, res) => res.sendFile(path.join(__dirname, 'views', 'add-friend.html')));
+// صفحة غرفة الدردشة الخاصة
+app.get('/chat-view/:userId/:friendId', (req, res) => res.sendFile(path.join(__dirname, 'views', 'chat-room.html')));
 
 app.post('/register', (req, res) => {
     const { name, age, password } = req.body;
@@ -67,7 +67,7 @@ app.post('/login', (req, res) => {
     else res.send('خطأ <a href="/login">عودة</a>');
 });
 
-// لوحة المطور (رجعتلك الحذف المتعدد وكل البيانات)
+// لوحة المطور
 app.post('/developer', (req, res) => {
     const { username, password } = req.body;
     if(username === 'user' && password === 'orangeuser') {
