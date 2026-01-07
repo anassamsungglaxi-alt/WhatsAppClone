@@ -3,127 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>شات أنس المطور</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <title>واتساب أنس - النسخة الاحترافية</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-    /* تصفير الهوامش عشان ميبقاش فيه فراغات */
-    * { box-sizing: border-box; }
-    body, html { 
-        margin: 0; 
-        padding: 0; 
-        height: 100%; 
-        width: 100%;
-        overflow: hidden; /* منع السكروول الخارجي للمتصفح */
-        font-family: sans-serif;
-    }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body, html { 
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            background-color: #e5ddd5; font-family: sans-serif;
+            overflow: hidden; /* يمنع اهتزاز الصفحة كلها */
+        }
 
-    .container { 
-        display: flex; 
-        flex-direction: column; 
-        height: 100vh; /* طول الشاشة بالظبط */
-        width: 100%; 
-    }
+        .container { display: flex; flex-direction: column; height: 100vh; width: 100%; }
 
-    header { 
-        background: #075E54; 
-        color: white; 
-        padding: 10px; 
-        text-align: center;
-        flex-shrink: 0; /* منع الهيدر إنه يصغر */
-    }
+        header { 
+            background: #075E54; color: white; padding: 12px; 
+            text-align: center; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
 
-    /* قائمة الأصدقاء - خليناها عرضية عشان توفر مساحة */
-    #friends-list { 
-        background: #fff; 
-        border-bottom: 1px solid #ddd; 
-        max-height: 80px; 
-        overflow-x: auto; /* سحب بالعرض لو الأصدقاء كتير */
-        flex-shrink: 0;
-    }
-    #friends { 
-        display: flex; 
-        padding: 5px; 
-        margin: 0; 
-        list-style: none; 
-    }
-    .friend-item { 
-        padding: 5px 10px; 
-        background: #eee; 
-        margin: 0 5px; 
-        border-radius: 15px; 
-        white-space: nowrap; /* منع نزول الاسم لسطر جديد */
-        font-size: 13px;
-    }
+        /* قسم إضافة صديق - رجعتهولك بشكل شيك */
+        #add-friend-area {
+            background: #fff; padding: 8px; display: flex; gap: 5px;
+            border-bottom: 1px solid #ddd; flex-shrink: 0;
+        }
+        #friend-id-input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+        #add-btn { background: #25D366; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
 
-    #chat-section { 
-        flex: 1; 
-        display: flex; 
-        flex-direction: column; 
-        background: #e5ddd5; 
-        overflow: hidden; /* عشان السكروول يبقا جوه الشات بوكس بس */
-    }
+        /* قائمة الأصدقاء */
+        #friends-list { 
+            background: #fff; border-bottom: 1px solid #ddd; 
+            max-height: 100px; overflow-x: auto; flex-shrink: 0;
+            display: flex; align-items: center; padding: 5px;
+        }
+        #friends { display: flex; list-style: none; padding: 0; margin: 0; gap: 10px; }
+        .friend-item { 
+            background: #f0f0f0; padding: 8px 15px; border-radius: 20px;
+            white-space: nowrap; font-size: 14px; position: relative; border: 1px solid #ddd;
+        }
 
-    /* أهم جزء: صندوق الدردشة */
-    #chat-box { 
-        flex: 1; 
-        overflow-y: scroll; /* تفعيل السحب فوق وتحت */
-        -webkit-overflow-scrolling: touch; /* سحب ناعم على الموبايل */
-        padding: 15px; 
-        display: flex; 
-        flex-direction: column; 
-    }
+        /* الشات بوكس - حل مشكلة السكرول */
+        #chat-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        #chat-box { 
+            flex: 1; 
+            overflow-y: auto; /* تفعيل السكرول */
+            padding: 15px; 
+            display: flex; 
+            flex-direction: column;
+            scroll-behavior: smooth; /* سكرول ناعم */
+            -webkit-overflow-scrolling: touch; /* دعم السحب السلس للأيفون والأندرويد */
+        }
 
-    .msg { 
-        padding: 8px 12px; 
-        margin: 5px 0; 
-        border-radius: 10px; 
-        max-width: 85%; 
-        word-wrap: break-word; /* كسر الكلام الطويل عشان ميعملش سحب بالعرض */
-        font-size: 15px;
-    }
-    .sent { background: #dcf8c6; align-self: flex-end; }
-    .received { background: #fff; align-self: flex-start; }
+        .msg { padding: 10px 15px; margin: 5px 0; border-radius: 15px; max-width: 80%; font-size: 15px; line-height: 1.4; elevation: 1; }
+        .sent { background: #dcf8c6; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .received { background: #fff; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .ticks { font-size: 11px; margin-right: 5px; color: #999; }
+        .seen { color: #34b7f1 !important; }
 
-    /* منطقة الكتابة */
-    #message-form { 
-        display: flex; 
-        padding: 10px; 
-        background: #f0f0f0; 
-        flex-shrink: 0; 
-    }
-    #message-input { 
-        flex: 1; 
-        border: none; 
-        padding: 12px; 
-        border-radius: 25px; 
-        font-size: 16px; /* عشان المتصفح ميعملش زوم تلقائي وقت الكتابة */
-    }
-    button[type="submit"] {
-        background: #075E54;
-        color: white;
-        border: none;
-        padding: 0 15px;
-        margin-right: 5px;
-        border-radius: 50%;
-        font-size: 18px;
-    }
-</style>
+        /* منطقة الكتابة */
+        #message-form { 
+            display: flex; padding: 10px; background: #f0f0f0; 
+            flex-shrink: 0; align-items: center; border-top: 1px solid #ddd;
+        }
+        #message-input { 
+            flex: 1; border: none; padding: 12px 15px; 
+            border-radius: 25px; font-size: 16px; outline: none;
+        }
+        #send-btn { 
+            background: #075E54; color: white; border: none; 
+            width: 45px; height: 45px; border-radius: 50%; margin-right: 8px;
+            display: flex; align-items: center; justify-content: center; font-size: 20px;
+        }
+
+        .notify-dot { color: #25D366; font-weight: bold; margin-right: 4px; }
+        #typing-status { color: #075E54; font-size: 12px; height: 18px; padding: 0 15px; font-weight: bold; }
+    </style>
 </head>
 <body>
 <div class="container">
-    <header><h3 id="display-name">واتساب أنس</h3></header>
-    <div id="friends-list"><ul id="friends" style="list-style:none; padding:0;"></ul></div>
+    <header><h3>واتساب أنس - المطور</h3></header>
+    
+    <div id="add-friend-area">
+        <input type="number" id="friend-id-input" placeholder="اكتب ID الصديق هنا...">
+        <button id="add-btn" onclick="addFriend()">إضافة</button>
+    </div>
+
+    <div id="friends-list">
+        <ul id="friends"></ul>
+    </div>
+
     <div id="chat-section">
-        <div style="padding:5px; background:#f9f9f9; display:flex; justify-content:space-between;">
-            <span id="active-chat-with">اختر صديق</span>
-            <button onclick="clearChat()" style="color:red; border:none; background:none; cursor:pointer;">مسح الشات 🗑️</button>
+        <div style="padding:8px; background:#eee; display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid #ddd;">
+            <span id="active-chat-with">اختر صديق لبدء الكلام</span>
+            <button onclick="clearChat()" style="color:red; border:none; background:none; cursor:pointer;">مسح السجل 🗑️</button>
         </div>
         <div id="typing-status"></div>
         <div id="chat-box"></div>
+        
         <form id="message-form">
             <input type="text" id="message-input" placeholder="اكتب رسالة..." autocomplete="off">
-            <button type="submit">إرسال</button>
+            <button type="submit" id="send-btn">➤</button>
         </form>
     </div>
 </div>
@@ -135,21 +112,40 @@
 
     socket.emit('join', userId);
 
+    // إضافة صديق بالـ ID
+    async function addFriend() {
+        const fId = document.getElementById('friend-id-input').value;
+        if(!fId) return alert("ادخل الـ ID أولاً");
+        const res = await fetch('/api/add-friend', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ userId, friendId: fId })
+        });
+        const data = await res.json();
+        if(data.success) {
+            alert("تمت الإضافة بنجاح!");
+            document.getElementById('friend-id-input').value = "";
+            loadFriends();
+        } else {
+            alert("الـ ID خطأ أو الشخص مضاف عندك فعلاً");
+        }
+    }
+
     async function loadFriends() {
         const res = await fetch('/api/friends/' + userId);
         const friends = await res.json();
         document.getElementById('friends').innerHTML = friends.map(f => `
             <li class="friend-item">
                 <span onclick="openChat('${f.id}', '${f.name}')" style="cursor:pointer;">
-                    ${f.name} <span class="notify-dot" id="dot-${f.id}">●</span>
+                    ${f.name} <span class="notify-dot" id="dot-${f.id}" style="display:none;">●</span>
                 </span>
-                <button onclick="removeFriend('${f.id}')" style="color:red; border:none; background:none;">❌</button>
+                <button onclick="removeFriend('${f.id}')" style="color:red; border:none; background:none; margin-right:8px; cursor:pointer;">×</button>
             </li>`).join('');
     }
 
     async function openChat(fId, fName) {
         activeFriendId = fId;
-        document.getElementById('active-chat-with').innerText = "مع: " + fName;
+        document.getElementById('active-chat-with').innerText = "دردشة مع: " + fName;
         document.getElementById('dot-' + fId).style.display = 'none';
         const res = await fetch(`/api/messages/${userId}/${fId}`);
         renderMessages(await res.json());
@@ -160,8 +156,12 @@
         const box = document.getElementById('chat-box');
         box.innerHTML = msgs.map(m => `
             <div class="msg ${m.from == userId ? 'sent' : 'received'}">
-                ${m.text} ${m.from == userId ? `<span class="ticks ${m.seen ? 'seen' : ''}">${m.seen ? '✔✔' : '✔'}</span>` : ''}
+                ${m.text}
+                <div style="text-align:left; height:10px;">
+                    ${m.from == userId ? `<span class="ticks ${m.seen ? 'seen' : ''}">${m.seen ? '✔✔' : '✔'}</span>` : ''}
+                </div>
             </div>`).join('');
+        // سكرول لتحت تلقائي
         box.scrollTop = box.scrollHeight;
     }
 
@@ -173,11 +173,16 @@
         input.value = '';
     };
 
-    document.getElementById('message-input').oninput = () => { if(activeFriendId) socket.emit('typing', { from: userId, to: activeFriendId }); };
+    document.getElementById('message-input').oninput = () => {
+        if(activeFriendId) socket.emit('typing', { from: userId, to: activeFriendId });
+    };
 
     socket.on('new-msg', (msg) => {
         if (activeFriendId && (msg.from == activeFriendId || msg.from == userId)) {
-            openChat(activeFriendId, document.getElementById('active-chat-with').innerText.replace('مع: ', ''));
+            // إعادة تحميل الرسائل فوراً
+            fetch(`/api/messages/${userId}/${activeFriendId}`)
+                .then(res => res.json())
+                .then(msgs => renderMessages(msgs));
         } else if (msg.from != userId) {
             document.getElementById('dot-' + msg.from).style.display = 'inline-block';
         }
@@ -190,19 +195,26 @@
         }
     });
 
-    socket.on('chat-seen', (data) => { if (activeFriendId == data.by) openChat(activeFriendId, ""); });
+    socket.on('chat-seen', (data) => {
+        if (activeFriendId == data.by) {
+            // تحديث الصحين الزرقاء فوراً
+            const ticks = document.querySelectorAll('.sent .ticks');
+            ticks.forEach(t => { t.innerText = '✔✔'; t.classList.add('seen'); });
+        }
+    });
+
+    async function clearChat() {
+        if(!activeFriendId) return;
+        if(confirm('مسح الشات نهائياً؟')){
+            await fetch('/api/delete-chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId, friendId:activeFriendId})});
+            document.getElementById('chat-box').innerHTML = '';
+        }
+    }
 
     async function removeFriend(fId) {
         if(confirm('حذف الصديق؟')){
             await fetch('/api/remove-friend', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId, friendId:fId})});
             loadFriends();
-        }
-    }
-
-    async function clearChat() {
-        if(confirm('مسح الشات؟')){
-            await fetch('/api/delete-chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId, friendId:activeFriendId})});
-            document.getElementById('chat-box').innerHTML = '';
         }
     }
 
